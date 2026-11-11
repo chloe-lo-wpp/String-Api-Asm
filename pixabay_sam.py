@@ -64,5 +64,5 @@ for i, prompt_result in enumerate(sam_data["prompt_results"]):
 result = Image.alpha_composite(result_img, overlay).convert("RGB")
 
 result.save("Sam_output.png")
-print("Saved to", os.path.abspath("Sam_output.png"))
+print("Sam return img saved to", os.path.abspath("Sam_output.png"))
 result.show()   
