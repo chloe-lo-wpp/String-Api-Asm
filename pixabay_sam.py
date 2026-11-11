@@ -24,7 +24,7 @@ with open("pixabay_download.jpg","wb")as file:
 payload = {
     "image": {"type": "url", "value": pixabay_img},
     "prompts": [
-        {"type": "text", "text": "otter"},
+        {"type": "text", "text": search_key_word},
         {"type": "text", "text": "eyes"},
     ],
     "output_prob_thresh": 0.5,
