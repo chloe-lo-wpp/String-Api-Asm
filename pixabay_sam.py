@@ -1,6 +1,7 @@
 from pathlib import Path
 from dotenv import load_dotenv
-import os
+import io, os, requests, webbrowser
+from PIL import Image, ImageDraw
 import requests
 
 env_path = Path(__file__).parent / "keys" / ".env"
@@ -17,8 +18,10 @@ response = requests.get(pixabay_url)
 pixabay_data = response.json()
 #print (pixabay_data["hits"][3]["pageURL"])
 
+
+img_url = "https://media.roboflow.com/inference/people-walking.jpg"
 payload = {
-    "image": {"type": "url", "value": "https://media.roboflow.com/inference/people-walking.jpg"},
+    "image": {"type": "url", "value": img_url},
     "prompts": [
         {"type": "text", "text": "person"},
         {"type": "text", "text": "backpack"},
@@ -27,10 +30,38 @@ payload = {
     "format": "polygon",  # or "rle"
 }
 
-response = requests.post(
+sam_response = requests.post(
     "https://serverless.roboflow.com/sam3/concept_segment",
     headers={"Authorization": f"Bearer {sam_key}"},
     json=payload,
 )
-for prompt_result in response.json()["prompt_results"]:
-    print(prompt_result["echo"], len(prompt_result["predictions"]), "instances")
+sam_response.raise_for_status()
+sam_data = sam_response.json()
+
+result_img = Image.open(io.BytesIO(requests.get(img_url).content)).convert("RGBA")
+overlay = Image.new("RGBA", result_img.size, (0, 0, 0, 0))
+draw = ImageDraw.Draw(overlay)
+
+colors = [(255, 80, 80), (80, 160, 255), (80, 220, 120), (255, 200, 60)]
+
+for i, prompt_result in enumerate(sam_data["prompt_results"]):
+    label = prompt_result["echo"]["text"]
+    r, g, b = colors[i % len(colors)]
+    print(label, len(prompt_result["predictions"]), "instances")
+
+    for pred in prompt_result["predictions"]:
+        for polygon in pred["masks"]:
+            pts = [tuple(p) for p in polygon]
+            if len(pts) < 3:
+                continue
+            draw.polygon(pts, fill=(r, g, b, 90), outline=(r, g, b, 255), width=3)
+        # label near the first point
+        if pred["masks"] and pred["masks"][0]:
+            x, y = pred["masks"][0][0]
+            draw.text((x, y - 12), f'{label} {pred["confidence"]:.2f}', fill=(r, g, b, 255))
+
+result = Image.alpha_composite(result_img, overlay).convert("RGB")
+
+result.save("output.png")
+print("Saved to", os.path.abspath("output.png"))
+result.show()   
